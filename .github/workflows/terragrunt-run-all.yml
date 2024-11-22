@@ -1,0 +1,71 @@
+name: Terragrunt run-all
+
+on:
+  workflow_call:
+    inputs:
+      command:
+        required: true
+        type: string
+      path:
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+ terragrunt-run-all:
+    name: "Terragrunt ${{ inputs.command }} on ${{ inputs.path }}"
+    runs-on: ubuntu-latest
+    container: alpine/terragrunt:1.5.7
+    #env:
+    #  TF_LOG: DEBUG
+    steps:
+      - name: Check out Repo
+        uses: actions/checkout@v4
+        with:
+          # Required for some Terragrunt functions to work
+          fetch-depth: 0
+
+      - name: Install jq and curl
+        run: |
+            apk update
+            apk add jq curl
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4.0.2
+        with:
+          role-to-assume: ${{ secrets.IAC_RESOURCE_PROVISIONING_ROLE }}
+          aws-region: ${{ secrets.IAC_RESOURCE_PROVISIONING_REGION }}
+
+      - name: Get Token Using GitHub App
+        id: get-github-token
+        uses: Xpanse-Shared-Resources/workflow-application-token-action@v3.0.0
+        with:
+          organization: ${{ github.repository_owner }}
+          application_id: ${{ secrets.GH_APP_TERRAFORM_EXECUTION_APP_ID }}
+          application_private_key: ${{ secrets.GH_APP_TERRAFORM_EXECUTION_PRIVATE_KEY }}
+
+      - name: Get id token
+        id: get-artifactory-token
+        uses: Xpanse-Shared-Resources/gha-get-artifactory-token@v1.2.0
+        with:
+          jfrog-platform-url: ${{ secrets.ARTIFACTORY_URL }}
+
+      - name: "Terragrunt ${{ inputs.command }} on ${{ inputs.path }}"
+        # See: https://github.com/actions/runner/issues/2033
+        run: |
+          export TG_TF_REGISTRY_TOKEN=${{ steps.get-artifactory-token.outputs.token }}
+          mkdir -p ~/.terraform.d
+          echo '{
+            "credentials": {
+              "${{ secrets.ARTIFACTORY_HOST }}": {
+                "token": "${{ steps.get-artifactory-token.outputs.token }}"
+              }
+            }
+          }' > ~/.terraform.d/credentials.tfrc.json 2>/dev/null
+          git config --global url."https://githubapp:${{ steps.get-github-token.outputs.token }}@github.com".insteadOf ssh://git@github.com
+          terragrunt run-all ${{ inputs.command }} --terragrunt-working-dir ${{ inputs.path }} --terragrunt-parallelism 8 --terragrunt-non-interactive
+          rm -rf ~/.terraform.d/credentials.tfrc.json
+      

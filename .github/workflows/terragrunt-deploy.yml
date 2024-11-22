@@ -1,0 +1,45 @@
+name: Terragrunt Deploy
+run-name: Deploy ${{ inputs.path }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      path:
+        required: true
+        description: Path
+        type: string
+
+jobs:
+
+  validate:
+    name: Validate
+    uses: ./.github/workflows/validate.yml
+    secrets: inherit
+
+  plan:
+    name: Terragrunt plan on ${{ inputs.path }}
+    uses: ./.github/workflows/terragrunt-run-all.yml
+    secrets: inherit
+    needs: [ validate ]
+    with:
+      command: plan
+      path: ${{ inputs.path }}
+
+  pre-check:
+    name: Pre-check
+    runs-on: ubuntu-latest
+    needs: [ plan ]
+    environment: live
+    steps:
+      - name: Environment Pre-check
+        shell: bash
+        run: echo "Performing pre-check against environment configuration. Execution will pause until required approval is received."
+
+  run-all:
+    name: Terragrunt deploy on ${{ inputs.path }}
+    uses: ./.github/workflows/terragrunt-run-all.yml
+    secrets: inherit
+    needs: [ pre-check ]
+    with:
+      command: apply
+      path: ${{ inputs.path }}

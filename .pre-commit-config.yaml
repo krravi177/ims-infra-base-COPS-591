@@ -1,0 +1,15 @@
+repos:
+  - repo: https://github.com/terraform-docs/terraform-docs
+    rev: "v0.16.0"
+    hooks:
+      #BEGIN_AUTOGEN
+      - id: terraform-docs-go
+        name: "terraform-docs-go - ./common/_global/iam"
+        args: ["markdown","table","--output-file","README.md","./common/_global/iam"]
+      - id: terraform-docs-go
+        name: "terraform-docs-go - ./common/_global/iam/.terraform/modules/role_with_inline_policy"
+        args: ["markdown","table","--output-file","README.md","./common/_global/iam/.terraform/modules/role_with_inline_policy"]
+      - id: terraform-docs-go
+        name: "terraform-docs-go - ./common/_global/iam"
+        args: ["markdown","table","--output-file","README.md","./common/_global/iam"]   
+      #END_AUTOGEN

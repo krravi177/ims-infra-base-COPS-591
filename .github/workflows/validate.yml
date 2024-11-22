@@ -1,0 +1,48 @@
+name: Validate
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  changes:
+    name: Detect Changes
+    outputs:
+      envs: ${{ steps.envs.outputs.changes }}
+      root: ${{ steps.root.outputs.root }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Repo
+        uses: actions/checkout@v4
+
+      - name: Detect Root Changes
+        id: root
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            root: terragrunt.hcl
+
+      - name: Detect Env Changes
+        id: envs
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            common: common/**
+
+  validate-common:
+    needs: [ changes ]
+    if: ${{ needs.changes.outputs.root == 'true' || contains(needs.changes.outputs.envs, 'common') }}
+    name: Validate Common
+    uses: Xpanse-Shared-Resources/ghw-terraform-validate/.github/workflows/workflow.yml@v1.6.0
+    with:
+      path: common
+      terragrunt: true
+      # CKV_TF_1: "Ensure Terraform module sources use a commit hash" - Discussed as CloudOps team. These are for internal dependencies and we aren't going to use hashes.
+      # CKV_AWS_51: "Ensure ECR Image Tags are immutable" - Mutable tags needed to support "latest"
+      # CKV_AWS_136: "Ensure that ECR repositories are encrypted using KMS" - PE-455
+      # CKV_AWS_163: "Ensure ECR image scanning on push is enabled" - Scanning is enabled on the registry level
+      checkov-soft-fail-on: CKV_TF_1,CKV_AWS_51,CKV_AWS_136,CKV_AWS_163
+    secrets: inherit
+
+  

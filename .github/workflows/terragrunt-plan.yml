@@ -1,0 +1,26 @@
+name: Terragrunt Plan
+run-name: Plan ${{ inputs.path }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      path:
+        required: true
+        description: Path
+        type: string
+
+jobs:
+
+  validate:
+    name: Validate
+    uses: ./.github/workflows/validate.yml
+    secrets: inherit
+
+  run-all:
+    name: Terragrunt plan on ${{ inputs.path }}
+    uses: ./.github/workflows/terragrunt-run-all.yml
+    secrets: inherit
+    needs: [ validate ]
+    with:
+      command: plan
+      path: ${{ inputs.path }}
